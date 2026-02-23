@@ -36,18 +36,16 @@ async def main():
     # Start scheduler once bot is ready
     @bot.event
     async def on_ready():
-        # Prefer #briefings for scheduled briefings, fall back to #wall-e
-        briefings_ch = bot.get_channel(settings.discord_briefings_channel_id)
-        fallback_ch = bot.get_channel(settings.discord_channel_id)
-        channel = briefings_ch or fallback_ch
+        fallback = bot.get_channel(settings.discord_channel_id)
+        sched_channels = {
+            "briefings": bot.get_channel(settings.discord_briefings_channel_id) or fallback,
+            "trending": bot.get_channel(settings.discord_trending_channel_id) or fallback,
+            "jobs": bot.get_channel(settings.discord_jobs_channel_id) or fallback,
+        }
 
-        if channel:
-            scheduler = create_scheduler(agent, channel)
-            scheduler.start()
-            logger.info("Scheduler started → #%s", channel.name)
-        else:
-            logger.warning("No channels found — scheduler not started.")
-
+        scheduler = create_scheduler(agent, sched_channels)
+        scheduler.start()
+        logger.info("Scheduler started with %d jobs.", len(scheduler.get_jobs()))
         logger.info("Wall-E is online! Listening on Discord...")
 
     # 5. Run the bot
