@@ -4,7 +4,9 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # Discord
     discord_bot_token: str
-    discord_channel_id: int
+    discord_channel_id: int          # #wall-e — main chat
+    discord_briefings_channel_id: int  # #briefings — morning briefings
+    discord_drafts_channel_id: int     # #drafts — post approvals
 
     # AI
     groq_api_key: str

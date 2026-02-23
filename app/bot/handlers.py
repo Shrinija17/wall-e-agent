@@ -17,23 +17,33 @@ def create_bot(agent: GeminiAgent, memory: MemoryStore) -> commands.Bot:
     intents.message_content = True
 
     bot = commands.Bot(command_prefix="!", intents=intents)
-    channel: discord.TextChannel | None = None
+    channels: dict[str, discord.TextChannel | None] = {
+        "chat": None,
+        "briefings": None,
+        "drafts": None,
+    }
 
-    # Wire up the approval callback so the agent can send drafts to Discord
+    # Wire up the approval callback so the agent can send drafts to #drafts
     async def _send_approval(draft_id: int, platform: str, content: str):
-        if channel:
-            await send_approval_message(draft_id, platform, content, channel)
+        ch = channels["drafts"] or channels["chat"]
+        if ch:
+            await send_approval_message(draft_id, platform, content, ch)
 
     agent.send_approval_fn = _send_approval
 
     @bot.event
     async def on_ready():
-        nonlocal channel
-        channel = bot.get_channel(settings.discord_channel_id)
-        if channel:
-            logger.info("Wall-E connected to #%s", channel.name)
-        else:
-            logger.warning("Could not find channel %s", settings.discord_channel_id)
+        channels["chat"] = bot.get_channel(settings.discord_channel_id)
+        channels["briefings"] = bot.get_channel(settings.discord_briefings_channel_id)
+        channels["drafts"] = bot.get_channel(settings.discord_drafts_channel_id)
+
+        found = [name for name, ch in channels.items() if ch]
+        missing = [name for name, ch in channels.items() if not ch]
+        if found:
+            logger.info("Wall-E connected to: %s", ", ".join(f"#{c}" for c in found))
+        if missing:
+            logger.warning("Channels not found: %s", ", ".join(missing))
+
         logger.info("Wall-E is online as %s", bot.user)
 
     @bot.command(name="start")
@@ -41,9 +51,13 @@ def create_bot(agent: GeminiAgent, memory: MemoryStore) -> commands.Bot:
         await ctx.send(
             "👋 Hey Shrinija! Wall-E is online.\n\n"
             "I can help with competitor intel, social post drafts, and anything JustPaid.\n\n"
+            "**Channels:**\n"
+            f"<#{settings.discord_channel_id}> — Chat with me\n"
+            f"<#{settings.discord_briefings_channel_id}> — Morning briefings\n"
+            f"<#{settings.discord_drafts_channel_id}> — Post drafts & approvals\n\n"
             "**Commands:**\n"
             "`!briefing` — Get your morning briefing\n"
-            "`!draft <platform> <topic>` — Draft a post\n"
+            "`!draft <x|linkedin> <topic>` — Draft a post\n"
             "`!pending` — See posts awaiting approval\n"
             "`!new` — Clear conversation history\n"
         )
@@ -55,13 +69,11 @@ def create_bot(agent: GeminiAgent, memory: MemoryStore) -> commands.Bot:
 
     @bot.command(name="briefing")
     async def briefing(ctx: commands.Context):
-        await ctx.send("☕ Running your morning briefing... hang tight.")
-        async with ctx.typing():
+        target = channels["briefings"] or ctx.channel
+        await ctx.send("☕ Running your morning briefing... check <#" + str(target.id) + ">")
+        async with target.typing():
             from app.scheduler.jobs import run_morning_briefing
-            result = await run_morning_briefing(agent, ctx.channel)
-            if result:
-                for chunk in chunk_message(result):
-                    await ctx.send(chunk)
+            await run_morning_briefing(agent, target)
 
     @bot.command(name="draft")
     async def draft(ctx: commands.Context, platform: str = None, *, topic: str = None):
@@ -77,8 +89,13 @@ def create_bot(agent: GeminiAgent, memory: MemoryStore) -> commands.Bot:
             await ctx.send("Platform must be `x` or `linkedin`.")
             return
 
+        drafts_ch = channels["drafts"]
+        if drafts_ch and ctx.channel.id != drafts_ch.id:
+            await ctx.send(f"✍️ Drafting... I'll post it in <#{drafts_ch.id}> for approval.")
+
         async with ctx.typing():
             response = await agent.chat(f"Draft a {platform} post about: {topic}")
+            # Response goes to the channel where the command was sent
             for chunk in chunk_message(response):
                 await ctx.send(chunk)
 
@@ -88,19 +105,24 @@ def create_bot(agent: GeminiAgent, memory: MemoryStore) -> commands.Bot:
         if not drafts:
             await ctx.send("No pending drafts. All clear! ✨")
             return
+        target = channels["drafts"] or ctx.channel
         for d in drafts[:10]:
-            await send_approval_message(d.id, d.platform, d.content, ctx.channel)
+            await send_approval_message(d.id, d.platform, d.content, target)
+        if target.id != ctx.channel.id:
+            await ctx.send(f"📝 Sent {len(drafts[:10])} draft(s) to <#{target.id}>")
 
     @bot.event
     async def on_message(message: discord.Message):
         # Process commands first
         await bot.process_commands(message)
 
-        # Ignore bots, commands, and messages outside the configured channel
+        # Ignore bots, commands
         if message.author.bot:
             return
         if message.content.startswith("!"):
             return
+
+        # Only respond in the #wall-e chat channel
         if message.channel.id != settings.discord_channel_id:
             return
 
