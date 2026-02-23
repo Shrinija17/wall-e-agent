@@ -89,21 +89,27 @@ JOBS_PROMPT = """Review the job postings below and create a curated digest for S
 - Skills: Python, SQL, data visualization, ML, statistical modeling
 - Currently: Marketing Analyst Intern at JustPaid (AI fintech startup, YC-backed)
 - Experience: SEO/competitive analysis, data-driven content, growth marketing, AI automation
-- Looking for: Data Analyst, Business Analyst, Product Analyst, Marketing Analyst roles
-- Industries: AI, fintech, SaaS, startups
+- **Target roles**: Marketing Analyst, Data Analyst, Business Analyst, Product Analyst — any entry-level Analyst role
+- Industries: AI, fintech, SaaS, startups, tech
 - Immigration: On OPT, needs STEM OPT-eligible paid role before June 2026
 - Bonus signals: companies that sponsor, startup-friendly, remote/hybrid OK
 
+## IMPORTANT — Format rules:
+- These are jobs posted in the LAST 24 HOURS only
+- For EVERY job, include the direct apply link (🔗 URL from the data)
+- Number each job clearly
+- Rank by fit: best matches first
+
 ## Your job:
-1. **Top Picks** — Highlight the 3-5 best-fit postings with why each is a good match
-2. **Worth a Look** — List any others that are decent but not perfect fits
-3. **Application Tips** — For the top picks, give 1-line advice on how to tailor the application
-4. **Skip** — If any results are clearly irrelevant, say so briefly
+1. **Top Picks** (up to 10) — Best-fit postings. For each: job title, company, why it's a match, and the apply link
+2. **Worth Applying** (remaining) — Decent fits. Title, company, quick note, and apply link
+3. **Application Tips** — For your top 3 picks, give 1-line advice on how to tailor the application
+4. **Skip** — If any results are clearly irrelevant (senior roles, wrong field), mention briefly
 
 ## Job Postings:
 {job_data}
 
-Be honest — if a posting is a stretch, say so. Shrinija's time is precious and the deadline is real."""
+Be honest — if a posting is a stretch, say so. Every link must be included so Shrinija can apply directly from Discord."""
 
 
 def build_jobs_prompt(job_data: str) -> str:

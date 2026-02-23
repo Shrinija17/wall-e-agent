@@ -55,17 +55,25 @@ def create_scheduler(
         )
         logger.info("Scheduled: trending scan at 8:30 AM → #%s", trending_ch.name)
 
-    # Job postings — 10:00 AM
+    # Job postings — every 12 hours (8 AM and 8 PM)
     jobs_ch = channels.get("jobs")
     if jobs_ch:
         scheduler.add_job(
             run_job_scan,
-            trigger=_cron_trigger("0 10 * * *"),
+            trigger=_cron_trigger("0 8 * * *"),
             args=[agent, jobs_ch],
-            id="job_scan",
-            name="Job Postings Scan",
+            id="job_scan_morning",
+            name="Job Scan (Morning)",
             replace_existing=True,
         )
-        logger.info("Scheduled: job scan at 10:00 AM → #%s", jobs_ch.name)
+        scheduler.add_job(
+            run_job_scan,
+            trigger=_cron_trigger("0 20 * * *"),
+            args=[agent, jobs_ch],
+            id="job_scan_evening",
+            name="Job Scan (Evening)",
+            replace_existing=True,
+        )
+        logger.info("Scheduled: job scan every 12h (8AM + 8PM) → #%s", jobs_ch.name)
 
     return scheduler
