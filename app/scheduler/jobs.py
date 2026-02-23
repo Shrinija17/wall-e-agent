@@ -90,9 +90,9 @@ async def run_job_scan(agent: GeminiAgent, channel: discord.TextChannel) -> str 
         results = await scan_jobs()
         formatted = format_job_results(results)
 
-        # 2. Feed to agent for analysis
+        # 2. Feed to agent for analysis (no tools needed — just analysis)
         prompt = build_jobs_prompt(formatted)
-        jobs_text = await agent.run_briefing(prompt)
+        jobs_text = await agent.run_briefing(prompt, tools=[])
 
         # 3. Send to Discord
         header = "💼 **Daily Job Scan**\n\n"

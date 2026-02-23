@@ -95,8 +95,13 @@ class GeminiAgent:
 
         return response_text or "I processed your request but didn't generate a text response."
 
-    async def run_briefing(self, briefing_prompt: str) -> str:
-        """Run a briefing prompt without saving to conversation history."""
+    async def run_briefing(self, briefing_prompt: str, tools: list | None = None) -> str:
+        """Run a briefing prompt without saving to conversation history.
+
+        Args:
+            tools: Optional list of tool definitions to use. Defaults to
+                   only draft_social_post. Pass empty list for no tools.
+        """
         memory_context = await self.memory.get_context_summary()
         system_prompt = build_system_prompt(memory_context)
         messages = [
@@ -104,15 +109,27 @@ class GeminiAgent:
             {"role": "user", "content": briefing_prompt},
         ]
 
+        # Only include draft_social_post by default — avoids Llama
+        # generating malformed save_memory/recall_memory calls
+        if tools is None:
+            tools = [t for t in TOOL_DEFINITIONS if t["function"]["name"] == "draft_social_post"]
+
+        api_kwargs = {
+            "model": settings.groq_model,
+            "messages": messages,
+            "max_tokens": 4096,
+        }
+        if tools:
+            api_kwargs["tools"] = tools
+            api_kwargs["tool_choice"] = "auto"
+
         response_text = ""
         for _ in range(settings.max_tool_iterations):
-            response = await self.client.chat.completions.create(
-                model=settings.groq_model,
-                messages=messages,
-                tools=TOOL_DEFINITIONS,
-                tool_choice="auto",
-                max_tokens=4096,
-            )
+            try:
+                response = await self.client.chat.completions.create(**api_kwargs)
+            except Exception as e:
+                logger.warning("Briefing API error: %s", e)
+                break
 
             choice = response.choices[0]
             message = choice.message
@@ -128,13 +145,17 @@ class GeminiAgent:
             for tool_call in message.tool_calls:
                 fn = tool_call.function
                 logger.info("Briefing tool: %s", fn.name)
-                args = json.loads(fn.arguments)
-                result = await execute_tool(
-                    fn.name,
-                    args,
-                    self.memory,
-                    self.send_approval_fn,
-                )
+                try:
+                    args = json.loads(fn.arguments)
+                    result = await execute_tool(
+                        fn.name,
+                        args,
+                        self.memory,
+                        self.send_approval_fn,
+                    )
+                except Exception as e:
+                    logger.warning("Briefing tool error: %s — %s", fn.name, e)
+                    result = f"Tool error: {e}"
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tool_call.id,
