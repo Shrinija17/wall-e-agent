@@ -8,6 +8,7 @@ from app.bot.approvals import get_pending_drafts, send_approval_message
 from app.bot.formatting import chunk_message
 from app.config import settings
 from app.memory.store import MemoryStore
+from app.scheduler.runner import create_scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ def create_bot(agent: GeminiAgent, memory: MemoryStore) -> commands.Bot:
 
     @bot.event
     async def on_ready():
+        # Populate all channel references
         channels["chat"] = bot.get_channel(settings.discord_channel_id)
         channels["briefings"] = bot.get_channel(settings.discord_briefings_channel_id)
         channels["drafts"] = bot.get_channel(settings.discord_drafts_channel_id)
@@ -47,6 +49,17 @@ def create_bot(agent: GeminiAgent, memory: MemoryStore) -> commands.Bot:
             logger.info("Wall-E connected to: %s", ", ".join(f"#{c}" for c in found))
         if missing:
             logger.warning("Channels not found: %s", ", ".join(missing))
+
+        # Start scheduler with channel routing
+        fallback = channels["chat"]
+        sched_channels = {
+            "briefings": channels["briefings"] or fallback,
+            "trending": channels["trending"] or fallback,
+            "jobs": channels["jobs"] or fallback,
+        }
+        scheduler = create_scheduler(agent, sched_channels)
+        scheduler.start()
+        logger.info("Scheduler started with %d jobs.", len(scheduler.get_jobs()))
 
         logger.info("Wall-E is online as %s", bot.user)
 
