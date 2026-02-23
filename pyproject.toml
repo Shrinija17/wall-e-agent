@@ -1,0 +1,23 @@
+[project]
+name = "wall-e-agent"
+version = "0.1.0"
+description = "Wall-E — always-on Telegram agent for JustPaid"
+requires-python = ">=3.11"
+dependencies = [
+    "groq>=1.0.0",
+    "discord.py>=2.3.0",
+    "apscheduler>=3.10.0",
+    "sqlalchemy>=2.0.0",
+    "asyncpg>=0.29.0",
+    "aiosqlite>=0.20.0",
+    "pydantic-settings>=2.0",
+    "tavily-python>=0.4.0",
+    "httpx>=0.27.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
