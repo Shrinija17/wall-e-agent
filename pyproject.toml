@@ -1,7 +1,7 @@
 [project]
 name = "wall-e-agent"
 version = "0.1.0"
-description = "Wall-E — always-on Telegram agent for JustPaid"
+description = "Wall-E — always-on Discord agent for JustPaid"
 requires-python = ">=3.11"
 dependencies = [
     "groq>=1.0.0",
